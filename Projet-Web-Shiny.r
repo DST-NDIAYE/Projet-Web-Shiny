@@ -340,6 +340,13 @@ server <- function(input, output, session) {
     req(input$file1)
     read.csv(input$file1$datapath, header = TRUE)
   })
+
+
+  observe({
+  req(data())
+  updateSelectInput(session, "target_column", choices = colnames(data()))
+})
+
   
   # InfoBox : Lignes et Colonnes
   output$rows_columns_info <- renderInfoBox({
