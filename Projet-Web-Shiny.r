@@ -452,6 +452,7 @@ model <- eventReactive(input$train_model, {
   }
 })
 
+
 # Évaluer les performances
 # Accuracy InfoBox
 output$accuracy_info <- renderInfoBox({
