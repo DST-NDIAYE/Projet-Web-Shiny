@@ -425,14 +425,23 @@ split_data <- reactive({
   dataset <- data_split$full_data
   target <- data_split$target
   
+  # Imputation temporaire des valeurs manquantes
+  imputed_data <- dataset %>%
+    mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .))) %>%
+    mutate(across(where(is.factor), ~ ifelse(is.na(.), "NA", .)))
+  
+  # Division en données d'entraînement et de test
   set.seed(123)
-  train_index <- caret::createDataPartition(dataset[[target]], p = 0.8, list = FALSE)
+  train_index <- caret::createDataPartition(imputed_data[[target]], p = 0.8, list = FALSE)
   
   list(
-    train_data = dataset[train_index, ],
-    test_data = dataset[-train_index, ]
+    train_data = imputed_data[train_index, ],
+    test_data = imputed_data[-train_index, ]
   )
 })
+
+
+
 
 # Entraîner le modèle
 model <- eventReactive(input$train_model, {
