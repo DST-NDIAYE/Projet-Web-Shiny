@@ -402,18 +402,21 @@ server <- function(input, output, session) {
 
  # Préparation des données
 prepare_data <- reactive({
-  req(data())
-  target <- colnames(data())[14]  
-  predictors <- colnames(data())[-14]  
-  
+  req(data(), input$target_column)
   dataset <- data()
-  dataset[[target]] <- as.factor(dataset[[target]])  
+  
+  # Vérifier si la colonne cible est catégorique ou non
+  target <- input$target_column
+  if (!is.factor(dataset[[target]])) {
+    dataset[[target]] <- as.factor(dataset[[target]])
+  }
   
   list(
-    full_data = dataset,  
-    target = target       
+    full_data = dataset,
+    target = target
   )
 })
+
 
 
 split_data <- reactive({
