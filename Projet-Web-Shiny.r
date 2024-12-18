@@ -418,18 +418,22 @@ prepare_data <- reactive({
 })
 
 
-
 split_data <- reactive({
   req(prepare_data())
   data_split <- prepare_data()
   dataset <- data_split$full_data
   target <- data_split$target
   
+  # Vérifier si la colonne cible est un facteur
+  if (!is.factor(dataset[[target]])) {
+    dataset[[target]] <- as.factor(dataset[[target]])
+  }
+  
   # Imputation temporaire des valeurs manquantes
   imputed_data <- dataset %>%
     mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .))) %>%
     mutate(across(where(is.factor), ~ ifelse(is.na(.), "NA", .)))
-  
+    
   # Division en données d'entraînement et de test
   set.seed(123)
   train_index <- caret::createDataPartition(imputed_data[[target]], p = 0.8, list = FALSE)
@@ -439,7 +443,6 @@ split_data <- reactive({
     test_data = imputed_data[-train_index, ]
   )
 })
-
 
 
 
