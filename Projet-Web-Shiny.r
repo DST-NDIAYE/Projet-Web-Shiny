@@ -867,11 +867,11 @@ output$missing_values_summary <- renderTable({
 
 
 observeEvent(input$apply_missing, {
-  req(input$missing_method)
+  req(input$missing_method, data())
   df <- data()
   
   if (input$missing_method == "Supprimer les lignes") {
-    df <- df[complete.cases(df), ]
+    df <- na.omit(df)
   } else if (input$missing_method == "Remplir par la moyenne") {
     df <- df %>% mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
   } else if (input$missing_method == "Remplir par la médiane") {
@@ -880,6 +880,7 @@ observeEvent(input$apply_missing, {
   
   data(df)  # Mettre à jour les données prétraitées
 })
+
 
 
 
