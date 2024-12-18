@@ -438,11 +438,22 @@ split_data <- reactive({
   set.seed(123)
   train_index <- caret::createDataPartition(imputed_data[[target]], p = 0.8, list = FALSE)
   
+  train_data <- imputed_data[train_index, ]
+  test_data <- imputed_data[-train_index, ]
+  
+  # Aligner les niveaux des variables catégorielles
+  for (col in colnames(train_data)) {
+    if (is.factor(train_data[[col]])) {
+      levels(test_data[[col]]) <- levels(train_data[[col]])
+    }
+  }
+  
   list(
-    train_data = imputed_data[train_index, ],
-    test_data = imputed_data[-train_index, ]
+    train_data = train_data,
+    test_data = test_data
   )
 })
+
 
 
 
@@ -466,6 +477,7 @@ model <- eventReactive(input$train_model, {
 
 
 # Évaluer les performances
+
 # Accuracy InfoBox
 output$accuracy_info <- renderInfoBox({
   req(model())
@@ -473,16 +485,27 @@ output$accuracy_info <- renderInfoBox({
   test_data <- data_split$test_data
   target <- prepare_data()$target
   
-  predictions <- predict(model(), newdata = test_data, type = if (input$model_choice == "Régression Logistique") "raw" else "class")
-  cm <- caret::confusionMatrix(as.factor(predictions), test_data[[target]])
+  # Prédictions
+  predictions <- predict(model(), newdata = test_data, type = "class")
   
+  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  predictions <- factor(predictions, levels = levels(test_data[[target]]))
+  test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
+  
+  # Matrice de confusion
+  cm <- caret::confusionMatrix(predictions, test_data[[target]])
+  
+  # Afficher l'accuracy
   infoBox(
     title = "Accuracy",
-    value = round(cm$overall["Accuracy"] * 100, 2),  # Afficher en pourcentage
+    value = round(cm$overall["Accuracy"] * 100, 2),
     icon = icon("check-circle"),
     color = "green"
   )
 })
+
+
+
 
 # Precision InfoBox
 output$precision_info <- renderInfoBox({
@@ -490,17 +513,27 @@ output$precision_info <- renderInfoBox({
   data_split <- split_data()
   test_data <- data_split$test_data
   target <- prepare_data()$target
-  
-  predictions <- predict(model(), newdata = test_data, type = if (input$model_choice == "Régression Logistique") "raw" else "class")
-  cm <- caret::confusionMatrix(as.factor(predictions), test_data[[target]])
-  
+
+  # Prédictions avec alignement des niveaux
+  predictions <- predict(model(), newdata = test_data, type = "class")
+
+
+
+  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  predictions <- factor(predictions, levels = levels(test_data[[target]]))
+  test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
+
+  # Matrice de confusion
+  cm <- caret::confusionMatrix(predictions, test_data[[target]])
+
   infoBox(
     title = "Precision",
-    value = round(cm$byClass["Precision"] * 100, 2),  # Afficher en pourcentage
+    value = round(cm$byClass["Precision"] * 100, 2),
     icon = icon("balance-scale"),
     color = "blue"
   )
 })
+
 
 # Recall InfoBox
 output$recall_info <- renderInfoBox({
@@ -508,17 +541,27 @@ output$recall_info <- renderInfoBox({
   data_split <- split_data()
   test_data <- data_split$test_data
   target <- prepare_data()$target
-  
-  predictions <- predict(model(), newdata = test_data, type = if (input$model_choice == "Régression Logistique") "raw" else "class")
-  cm <- caret::confusionMatrix(as.factor(predictions), test_data[[target]])
-  
+
+  # Prédictions avec alignement des niveaux
+  predictions <- predict(model(), newdata = test_data, type = "class")
+
+
+  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  predictions <- factor(predictions, levels = levels(test_data[[target]]))
+  test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
+
+
+  # Matrice de confusion
+  cm <- caret::confusionMatrix(predictions, test_data[[target]])
+
   infoBox(
     title = "Recall",
-    value = round(cm$byClass["Recall"] * 100, 2),  # Afficher en pourcentage
+    value = round(cm$byClass["Recall"] * 100, 2),
     icon = icon("sync-alt"),
     color = "yellow"
   )
 })
+
 
 # F1-Score InfoBox
 output$f1_score_info <- renderInfoBox({
@@ -526,17 +569,29 @@ output$f1_score_info <- renderInfoBox({
   data_split <- split_data()
   test_data <- data_split$test_data
   target <- prepare_data()$target
+
+  # Prédictions avec alignement des niveaux
+  predictions <- predict(model(), newdata = test_data, type = "class")
+
+
+
+  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  predictions <- factor(predictions, levels = levels(test_data[[target]]))
+  test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
+
   
-  predictions <- predict(model(), newdata = test_data, type = if (input$model_choice == "Régression Logistique") "raw" else "class")
-  cm <- caret::confusionMatrix(as.factor(predictions), test_data[[target]])
-  
+  # Matrice de confusion
+  cm <- caret::confusionMatrix(predictions, test_data[[target]])
+
   infoBox(
     title = "F1-Score",
-    value = round(cm$byClass["F1"] * 100, 2),  # Afficher en pourcentage
+    value = round(cm$byClass["F1"] * 100, 2),
     icon = icon("chart-line"),
     color = "red"
   )
 })
+
+
 
 
 output$roc_curve <- renderPlotly({
