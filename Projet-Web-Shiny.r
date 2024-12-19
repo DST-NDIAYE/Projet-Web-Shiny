@@ -405,11 +405,19 @@ prepare_data <- reactive({
   req(data(), input$target_column)
   dataset <- data()
   
-  # Vérifier si la colonne cible est catégorique ou non
+  # Vérification si la colonne cible existe
   target <- input$target_column
+  if (is.null(dataset[[target]])) {
+    stop("La colonne cible spécifiée n'existe pas dans les données.")
+  }
+  
+  # Conversion explicite de la colonne cible en facteur
   if (!is.factor(dataset[[target]])) {
     dataset[[target]] <- as.factor(dataset[[target]])
   }
+  
+  cat("Niveaux de la colonne cible après conversion :\n")
+  print(levels(dataset[[target]]))
   
   list(
     full_data = dataset,
@@ -418,41 +426,36 @@ prepare_data <- reactive({
 })
 
 
+
+
 split_data <- reactive({
   req(prepare_data())
   data_split <- prepare_data()
   dataset <- data_split$full_data
   target <- data_split$target
   
-  # Vérifier si la colonne cible est un facteur
-  if (!is.factor(dataset[[target]])) {
-    dataset[[target]] <- as.factor(dataset[[target]])
-  }
-  
-  # Imputation temporaire des valeurs manquantes
-  imputed_data <- dataset %>%
-    mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .))) %>%
-    mutate(across(where(is.factor), ~ ifelse(is.na(.), "NA", .)))
-    
   # Division en données d'entraînement et de test
   set.seed(123)
-  train_index <- caret::createDataPartition(imputed_data[[target]], p = 0.8, list = FALSE)
+  train_index <- caret::createDataPartition(dataset[[target]], p = 0.8, list = FALSE)
+  train_data <- dataset[train_index, ]
+  test_data <- dataset[-train_index, ]
   
-  train_data <- imputed_data[train_index, ]
-  test_data <- imputed_data[-train_index, ]
+  # Vérification et alignement explicite des niveaux
+  train_data[[target]] <- factor(train_data[[target]], levels = unique(dataset[[target]]))
+  test_data[[target]] <- factor(test_data[[target]], levels = levels(train_data[[target]]))
   
-  # Aligner les niveaux des variables catégorielles
-  for (col in colnames(train_data)) {
-    if (is.factor(train_data[[col]])) {
-      levels(test_data[[col]]) <- levels(train_data[[col]])
-    }
-  }
+  cat("Niveaux dans les données d'entraînement :\n")
+  print(levels(train_data[[target]]))
+  cat("Niveaux dans les données de test :\n")
+  print(levels(test_data[[target]]))
   
   list(
     train_data = train_data,
     test_data = test_data
   )
 })
+
+
 
 
 
@@ -476,6 +479,7 @@ model <- eventReactive(input$train_model, {
 })
 
 
+
 # Évaluer les performances
 
 # Accuracy InfoBox
@@ -488,14 +492,14 @@ output$accuracy_info <- renderInfoBox({
   # Prédictions
   predictions <- predict(model(), newdata = test_data, type = "class")
   
-  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  # Aligner les niveaux
   predictions <- factor(predictions, levels = levels(test_data[[target]]))
   test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
   
   # Matrice de confusion
   cm <- caret::confusionMatrix(predictions, test_data[[target]])
   
-  # Afficher l'accuracy
+  # InfoBox
   infoBox(
     title = "Accuracy",
     value = round(cm$overall["Accuracy"] * 100, 2),
@@ -507,25 +511,25 @@ output$accuracy_info <- renderInfoBox({
 
 
 
+
 # Precision InfoBox
 output$precision_info <- renderInfoBox({
   req(model())
   data_split <- split_data()
   test_data <- data_split$test_data
   target <- prepare_data()$target
-
-  # Prédictions avec alignement des niveaux
+  
+  # Prédictions
   predictions <- predict(model(), newdata = test_data, type = "class")
-
-
-
-  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  
+  # Aligner les niveaux
   predictions <- factor(predictions, levels = levels(test_data[[target]]))
   test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
-
+  
   # Matrice de confusion
   cm <- caret::confusionMatrix(predictions, test_data[[target]])
-
+  
+  # InfoBox
   infoBox(
     title = "Precision",
     value = round(cm$byClass["Precision"] * 100, 2),
@@ -533,6 +537,7 @@ output$precision_info <- renderInfoBox({
     color = "blue"
   )
 })
+
 
 
 # Recall InfoBox
@@ -569,20 +574,18 @@ output$f1_score_info <- renderInfoBox({
   data_split <- split_data()
   test_data <- data_split$test_data
   target <- prepare_data()$target
-
-  # Prédictions avec alignement des niveaux
+  
+  # Prédictions
   predictions <- predict(model(), newdata = test_data, type = "class")
-
-
-
-  # Assurez-vous que les niveaux des prédictions correspondent à ceux de la colonne cible
+  
+  # Aligner les niveaux
   predictions <- factor(predictions, levels = levels(test_data[[target]]))
   test_data[[target]] <- factor(test_data[[target]], levels = levels(predictions))
-
   
   # Matrice de confusion
   cm <- caret::confusionMatrix(predictions, test_data[[target]])
-
+  
+  # InfoBox
   infoBox(
     title = "F1-Score",
     value = round(cm$byClass["F1"] * 100, 2),
@@ -591,6 +594,19 @@ output$f1_score_info <- renderInfoBox({
   )
 })
 
+
+observeEvent(input$train_model, {
+  req(split_data())
+  data_split <- split_data()
+  train_data <- data_split$train_data
+  test_data <- data_split$test_data
+  target <- prepare_data()$target
+
+  cat("Niveaux dans les données d'entraînement :\n")
+  print(levels(train_data[[target]]))
+  cat("Niveaux dans les données de test :\n")
+  print(levels(test_data[[target]]))
+})
 
 
 
